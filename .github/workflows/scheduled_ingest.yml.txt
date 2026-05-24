@@ -1,0 +1,51 @@
+name: AeroStream Scheduled Lakehouse Ingestion
+
+on:
+  schedule:
+    # Runs automatically every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Allows you to trigger it manually from your GitHub "Actions" tab!
+
+jobs:
+  run-pipeline:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout your code
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    # 2. Setup Python environment
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+
+    # 3. Cache dependencies to speed up runs
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # 4. Run the Ingestion script to pull live flights
+    - name: Ingest Live Flights (Bronze & Silver)
+      run: |
+        python src/ingest.py
+
+    # 5. Run dbt to materialize Gold analytics tables
+    - name: Run dbt Transformations (Gold)
+      run: |
+        cd dbt_project
+        pip install "mashumaro>=3.15" # ensure python 3.13 compatibility
+        dbt run --profiles-dir .
+        dbt test --profiles-dir .
+        cd ..
+
+    # 6. Push the updated database back to your repository
+    - name: Commit and Push Database Update
+      run: |
+        git config --global user.name "AeroStream Automation Bot"
+        git config --global user.email "bot@aerostream.io"
+        git add data/lakehouse.db data/bronze/
+        git commit -m "chrono: automated live flight ingestion and dbt compile [skip ci]" || echo "No changes to commit"
+        git push origin main
