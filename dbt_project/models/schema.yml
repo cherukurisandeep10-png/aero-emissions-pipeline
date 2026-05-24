@@ -1,0 +1,38 @@
+version: 2
+
+models:
+  - name: stg_flights
+    description: "Staged and deduplicated aviation transponder state vectors from OpenSky Network API."
+    columns:
+      - name: aircraft_icao24
+        description: "The unique 24-bit ICAO transponder hex address."
+        tests:
+          - not_null
+      - name: flight_callsign
+        description: "The active flight callsign (e.g. SWA1204, AAL89)."
+      - name: co2_emissions_kg_s
+        description: "Calculated rate of CO2 emissions in kilograms per second."
+        tests:
+          - not_null
+
+  - name: dim_aircraft_types
+    description: "Aggregated metric-by-category dimensional model detailing typical operational baselines."
+    columns:
+      - name: aircraft_category
+        description: "Broad categorization of aircraft type (e.g., Widebody Jet, Narrowbody Jet, etc.)"
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_flights_emissions
+    description: "Granular fact model tracking operational flight parameters and carbon emission metrics per snapshot."
+    columns:
+      - name: aircraft_icao24
+        description: "The unique 24-bit ICAO transponder hex address."
+        tests:
+          - not_null
+      - name: flight_phase
+        description: "Derived operational phase of flight (Climbing, Cruising, Descending, On Ground)."
+        tests:
+          - accepted_values:
+              values: ['Climbing', 'Cruising', 'Descending', 'On Ground']

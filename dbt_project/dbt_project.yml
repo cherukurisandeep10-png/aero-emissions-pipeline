@@ -1,0 +1,26 @@
+name: 'aero_emissions_dbt'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which profile to use from profiles.yml
+profile: 'aero_emissions_profile'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+models:
+  aero_emissions_dbt:
+    # Configures all models in the staging directory as views
+    staging:
+      +materialized: view
+    # Configures all models in the marts directory as tables or incremental
+    marts:
+      +materialized: table

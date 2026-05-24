@@ -1,0 +1,8 @@
+aero_emissions_profile:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: '../data/lakehouse.db'
+      schema: main
+      threads: 4
