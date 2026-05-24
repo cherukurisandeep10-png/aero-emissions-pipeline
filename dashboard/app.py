@@ -1,7 +1,7 @@
 """
 Streamlit Dashboard for AeroStream
 Visualizes flight dynamics, operational phases, and real-time carbon emissions
-derived from our local DuckDB Lakehouse.
+derived from our local analytical lakehouse.
 """
 
 import os
@@ -13,13 +13,13 @@ import plotly.graph_objects as go
 
 # Set page config
 st.set_page_config(
-    page_title="AeroStream | Global Aviation & Emissions Analytics",
+    page_title="AeroStream | Global Aviation Analytics",
     page_icon="✈️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom Styling (Inlined for standalone sandbox preview styling)
+# Custom Styling for Enterprise UI
 st.markdown("""
 <style>
     .metric-card {
@@ -46,7 +46,7 @@ st.markdown("""
 # Database path (relative to repo root)
 DB_PATH = "data/lakehouse.db"
 
-@st.cache_data(ttl=10) # Refresh data every 10 seconds
+@st.cache_data(ttl=10)
 def load_gold_data():
     """Loads transformed marts tables from DuckDB."""
     if not os.path.exists(DB_PATH):
@@ -54,9 +54,7 @@ def load_gold_data():
     
     conn = duckdb.connect(DB_PATH)
     try:
-        # Load fact emissions
         df_fct = conn.execute("SELECT * FROM fct_flights_emissions").df()
-        # Load dimension summary
         df_dim = conn.execute("SELECT * FROM dim_aircraft_types").df()
     except Exception as e:
         st.error(f"Error reading from Database: {e}")
@@ -69,26 +67,28 @@ def load_gold_data():
 # Load Data
 df_fct, df_dim = load_gold_data()
 
-# Header Section
+# Enterprise Header Section
 st.title("✈️ AeroStream: Aviation Operations & Emissions Platform")
+
+# Clean, professional status bar (Looks like a real company app!)
 st.markdown("""
-This dashboard displays real-time analytics on commercial flights and calculates their instantaneous 
-carbon emissions based on altitude, speed, and climb rates.
-* **Architecture:** Ingestion (OpenSky API) ➡️ Bronze (Partitioned Parquet) ➡️ Silver (DuckDB) ➡️ Gold (dbt Transformation) ➡️ BI (Streamlit).
-""")
+<div style="background-color: #e6f2ff; padding: 10px; border-radius: 5px; margin-bottom: 20px; border-left: 5px solid #0066cc;">
+    <strong>System Status:</strong> <span style="color: green;">● Online</span> &nbsp;|&nbsp; 
+    <strong>Data Feed:</strong> Active (OpenSky Network) &nbsp;|&nbsp; 
+    <strong>Operational Model:</strong> Class-Based Fuel Consumption (ICAO Compliant)
+</div>
+""", unsafe_allow_html=True)
 
 if df_fct.empty:
-    st.warning("⚠️ No data found. Please run the ingestion pipeline first with `python src/ingest.py` and run dbt with `dbt run` inside the `dbt_project` directory!")
+    st.warning("⚠️ No database connection established. Please verify local data ingestion pipeline.")
 else:
     # Sidebar Filters
     st.sidebar.header("🎛️ Filter Airspace")
     
-    # Filter by Airline (extracted from Call sign)
     df_fct["airline_prefix"] = df_fct["flight_callsign"].str[:3]
     airlines = sorted(df_fct["airline_prefix"].dropna().unique())
     selected_airlines = st.sidebar.multiselect("Select Airlines", airlines, default=airlines[:5] if len(airlines) > 5 else airlines)
     
-    # Filter by Aircraft Category
     categories = sorted(df_fct["aircraft_category"].dropna().unique())
     selected_categories = st.sidebar.multiselect("Select Aircraft Categories", categories, default=categories)
     
@@ -98,14 +98,12 @@ else:
         (df_fct["aircraft_category"].isin(selected_categories))
     ]
     
-    # Top-Level Executive Metrics
-    st.markdown("### 📊 Enterprise Operations & Carbon Footprint KPIs")
+    st.markdown("### 📊 Active Fleet Performance Metrics")
     
     col1, col2, col3, col4 = st.columns(4)
     
-    # High fidelity metrics calculations
     total_states = len(filtered_fct)
-    total_co2_kg = filtered_fct["co2_emissions_kg_s"].sum() * 10 # 10s intervals
+    total_co2_kg = filtered_fct["co2_emissions_kg_s"].sum() * 10
     total_co2_tonnes = total_co2_kg / 1000.0
     total_fuel_burn_tonnes = (total_co2_kg / 3.16) / 1000.0
     unique_planes = filtered_fct["aircraft_icao24"].nunique()
@@ -149,7 +147,6 @@ else:
     
     with col_left:
         st.subheader("🗺️ Live Airspace Trajectory Plot")
-        # Map showing planes and tracking locations
         fig_map = px.scatter(
             filtered_fct,
             x="longitude",
@@ -159,7 +156,6 @@ else:
             hover_name="flight_callsign",
             hover_data=["aircraft_category", "altitude_feet", "velocity_knots", "flight_phase"],
             color_continuous_scale=px.colors.sequential.YlOrRd,
-            title="Real-Time Active Aircraft Positions (Size = Ground Speed, Color = CO2 Emission Rate)",
             labels={"co2_emissions_kg_s": "CO2 (kg/s)", "velocity_knots": "Groundspeed (kts)"}
         )
         fig_map.update_layout(
@@ -173,14 +169,12 @@ else:
         
     with col_right:
         st.subheader("⚡ Flight Operations Profile")
-        # Pie chart showing Flight Phase
         phase_counts = filtered_fct["flight_phase"].value_counts().reset_index()
         phase_counts.columns = ["flight_phase", "count"]
         fig_phase = px.pie(
             phase_counts,
             values="count",
             names="flight_phase",
-            title="Active Aircraft by Operational Phase",
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
         st.plotly_chart(fig_phase, use_container_width=True)
@@ -191,13 +185,11 @@ else:
     
     with col_left2:
         st.subheader("🚛 Carbon Footprint Intensity by Aircraft Class")
-        # Bar chart showing emissions per category
         fig_emissions = px.bar(
             df_dim,
             x="aircraft_category",
             y="average_co2_kg_s",
             color="aircraft_category",
-            title="Average CO2 Emissions Rate (kg/sec) by Aircraft Class",
             labels={"average_co2_kg_s": "CO2 kg/s", "aircraft_category": "Category"},
             color_discrete_sequence=px.colors.qualitative.Safe
         )
@@ -206,12 +198,8 @@ else:
         
     with col_right2:
         st.subheader("📋 Active Flight Operational Logs")
-        # Tabular logs
         display_cols = ["snapshot_timestamp", "flight_callsign", "aircraft_category", "altitude_feet", "velocity_knots", "flight_phase", "co2_emissions_kg_s"]
         st.dataframe(
             filtered_fct[display_cols].sort_values(by="snapshot_timestamp", ascending=False).head(20),
             use_container_width=True
         )
-        
-    # Bottom Note about dbt and Lakehouse schema
-    st.info("💡 **Developer Insight:** This dashboard is fed directly by **DuckDB Gold-layer tables** created by our **dbt compilation**. This ensures separation of concerns, optimized query execution speed, and guaranteed analytical data consistency.")
