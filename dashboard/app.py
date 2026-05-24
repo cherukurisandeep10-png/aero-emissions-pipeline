@@ -2,7 +2,7 @@
 Streamlit Dashboard for AeroStream
 Visualizes flight dynamics, operational phases, and real-time carbon emissions
 derived from our local analytical lakehouse.
-Features a clean, modern corporate light theme and compact, high-resolution aviation visuals.
+Features a clean, modern corporate light theme, compact visuals, and search filters.
 """
 
 import os
@@ -32,6 +32,46 @@ st.markdown("""
     section[data-testid="stSidebar"] {
         background-color: #0f172a !important;
         border-right: 1px solid #e2e8f0;
+    }
+    
+    /* Main Header Container */
+    .header-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 15px 25px;
+        margin-bottom: 25px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+    }
+    
+    .main-title {
+        font-family: 'Inter', sans-serif;
+        font-weight: 800;
+        font-size: 32px;
+        color: #0f172a;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    
+    .subtitle {
+        font-size: 14px;
+        color: #64748b;
+        margin-top: 5px;
+    }
+    
+    /* Compact Flight Picture Box styling */
+    .compact-img-box {
+        width: 180px;
+        height: 100px;
+        border-radius: 8px;
+        overflow: hidden;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
     
     /* Operational Status Banner - Professional Ice Blue */
@@ -155,7 +195,6 @@ def load_gold_data():
 df_fct, df_dim = load_gold_data()
 
 # 📰 Compact, Unified Header (Title on left, small box-sized aircraft photo on right)
-# Completely implemented in raw HTML to avoid Streamlit sibling container nesting glitches
 st.markdown("""
 <div style="display: flex; justify-content: space-between; align-items: center; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 15px 25px; margin-bottom: 25px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
     <div style="flex-grow: 1;">
@@ -201,12 +240,21 @@ else:
     categories = sorted(df_fct["aircraft_category"].dropna().unique())
     selected_categories = st.sidebar.multiselect("Select Aircraft Classes", categories, default=categories)
     
-    # Filter logic
+    # 🔍 NEW SEARCH FEATURE: Target specific flight callsign (Enterprise search tool)
+    st.sidebar.markdown("<hr style='border-color: #1e293b;' />", unsafe_allow_html=True)
+    st.sidebar.markdown("<h3 style='color: #f1f5f9; font-size: 15px; font-weight: 700; margin-bottom: 5px;'>🔍 Target Active Flight</h3>", unsafe_allow_html=True)
+    search_callsign = st.sidebar.text_input("Enter Callsign (e.g. DAL7174, UPS120)", value="").strip().upper()
+    
+    # Apply baseline filters
     filtered_fct = df_fct[
         (df_fct["airline_prefix"].isin(selected_airlines)) & 
         (df_fct["aircraft_category"].isin(selected_categories))
     ]
     
+    # Apply search filter if user typed anything
+    if search_callsign:
+        filtered_fct = filtered_fct[filtered_fct["flight_callsign"].str.upper().str.contains(search_callsign)]
+        
     # Compute metrics
     total_states = len(filtered_fct)
     total_co2_kg = filtered_fct["co2_emissions_kg_s"].sum() * 10
@@ -236,80 +284,86 @@ else:
     </div>
     """, unsafe_allow_html=True)
     
-    # Grid Columns
-    col_left, col_right = st.columns([3, 2])
-    
-    with col_left:
-        st.markdown("<h3 class='section-header'>🗺️ Spatial Flight Trajectory Radar</h3>", unsafe_allow_html=True)
-        # Map showing planes and tracking locations
-        fig_map = px.scatter(
-            filtered_fct,
-            x="longitude",
-            y="latitude",
-            color="co2_emissions_kg_s",
-            size="velocity_knots",
-            hover_name="flight_callsign",
-            hover_data=["aircraft_category", "altitude_feet", "velocity_knots", "flight_phase"],
-            color_continuous_scale=px.colors.sequential.Bluered,
-            labels={"co2_emissions_kg_s": "CO2 (kg/s)", "velocity_knots": "Groundspeed (kts)"}
-        )
-        fig_map.update_layout(
-            plot_bgcolor="#f8fafc",
-            paper_bgcolor="#f8fafc",
-            font_color="#1e293b",
-            xaxis_title="Longitude Coordinate",
-            yaxis_title="Latitude Coordinate",
-            margin=dict(l=0, r=0, t=10, b=0)
-        )
-        st.plotly_chart(fig_map, use_container_width=True)
+    if filtered_fct.empty:
+        st.info("ℹ️ No active aircraft found matching that callsign query. Clear the text search or adjust your carrier filters!")
+    else:
+        # Grid Columns
+        col_left, col_right = st.columns([3, 2])
         
-    with col_right:
-        st.markdown("<h3 class='section-header'>⚡ Airspace Operational Phase Mix</h3>", unsafe_allow_html=True)
-        phase_counts = filtered_fct["flight_phase"].value_counts().reset_index()
-        phase_counts.columns = ["flight_phase", "count"]
-        fig_phase = px.pie(
-            phase_counts,
-            values="count",
-            names="flight_phase",
-            color_discrete_sequence=px.colors.qualitative.Safe
-        )
-        fig_phase.update_layout(
-            plot_bgcolor="#f8fafc",
-            paper_bgcolor="#f8fafc",
-            font_color="#1e293b",
-            margin=dict(l=0, r=0, t=10, b=0)
-        )
-        st.plotly_chart(fig_phase, use_container_width=True)
+        with col_left:
+            st.markdown("<h3 class='section-header'>🗺️ Spatial Flight Trajectory Radar</h3>", unsafe_allow_html=True)
+            fig_map = px.scatter(
+                filtered_fct,
+                x="longitude",
+                y="latitude",
+                color="co2_emissions_kg_s",
+                size="velocity_knots" if total_states > 1 else None, # avoid single point size error
+                hover_name="flight_callsign",
+                hover_data=["aircraft_category", "altitude_feet", "velocity_knots", "flight_phase"],
+                color_continuous_scale=px.colors.sequential.Bluered,
+                labels={"co2_emissions_kg_s": "CO2 (kg/s)", "velocity_knots": "Groundspeed (kts)"}
+            )
+            # Add sizing backup for single flight search targeting
+            if total_states == 1:
+                fig_map.update_traces(marker=dict(size=18, symbol="triangle-up"))
+                
+            fig_map.update_layout(
+                plot_bgcolor="#f8fafc",
+                paper_bgcolor="#f8fafc",
+                font_color="#1e293b",
+                xaxis_title="Longitude Coordinate",
+                yaxis_title="Latitude Coordinate",
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            st.plotly_chart(fig_map, use_container_width=True)
+            
+        with col_right:
+            st.markdown("<h3 class='section-header'>⚡ Airspace Operational Phase Mix</h3>", unsafe_allow_html=True)
+            phase_counts = filtered_fct["flight_phase"].value_counts().reset_index()
+            phase_counts.columns = ["flight_phase", "count"]
+            fig_phase = px.pie(
+                phase_counts,
+                values="count",
+                names="flight_phase",
+                color_discrete_sequence=px.colors.qualitative.Safe
+            )
+            fig_phase.update_layout(
+                plot_bgcolor="#f8fafc",
+                paper_bgcolor="#f8fafc",
+                font_color="#1e293b",
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            st.plotly_chart(fig_phase, use_container_width=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    col_left2, col_right2 = st.columns(2)
-    
-    with col_left2:
-        st.markdown("<h3 class='section-header'>🚛 Carbon Footprint Intensity by Class</h3>", unsafe_allow_html=True)
-        fig_emissions = px.bar(
-            df_dim,
-            x="aircraft_category",
-            y="average_co2_kg_s",
-            color="aircraft_category",
-            labels={"average_co2_kg_s": "CO2 kg/s", "aircraft_category": "Class"},
-            color_discrete_sequence=px.colors.qualitative.Safe
-        )
-        fig_emissions.update_layout(
-            plot_bgcolor="#f8fafc",
-            paper_bgcolor="#f8fafc",
-            font_color="#1e293b",
-            showlegend=False,
-            xaxis_title="Aircraft Class",
-            yaxis_title="Average CO2 (kg/sec)",
-            margin=dict(l=0, r=0, t=10, b=0)
-        )
-        st.plotly_chart(fig_emissions, use_container_width=True)
+        st.markdown("<br>", unsafe_allow_html=True)
         
-    with col_right2:
-        st.markdown("<h3 class='section-header'>📋 Tactical Operational Logs</h3>", unsafe_allow_html=True)
-        display_cols = ["snapshot_timestamp", "flight_callsign", "aircraft_category", "altitude_feet", "velocity_knots", "flight_phase", "co2_emissions_kg_s"]
-        st.dataframe(
-            filtered_fct[display_cols].sort_values(by="snapshot_timestamp", ascending=False).head(20),
-            use_container_width=True
-        )
+        col_left2, col_right2 = st.columns(2)
+        
+        with col_left2:
+            st.markdown("<h3 class='section-header'>🚛 Carbon Footprint Intensity by Class</h3>", unsafe_allow_html=True)
+            fig_emissions = px.bar(
+                df_dim,
+                x="aircraft_category",
+                y="average_co2_kg_s",
+                color="aircraft_category",
+                labels={"average_co2_kg_s": "CO2 kg/s", "aircraft_category": "Class"},
+                color_discrete_sequence=px.colors.qualitative.Safe
+            )
+            fig_emissions.update_layout(
+                plot_bgcolor="#f8fafc",
+                paper_bgcolor="#f8fafc",
+                font_color="#1e293b",
+                showlegend=False,
+                xaxis_title="Aircraft Class",
+                yaxis_title="Average CO2 (kg/sec)",
+                margin=dict(l=0, r=0, t=10, b=0)
+            )
+            st.plotly_chart(fig_emissions, use_container_width=True)
+            
+        with col_right2:
+            st.markdown("<h3 class='section-header'>📋 Tactical Operational Logs</h3>", unsafe_allow_html=True)
+            display_cols = ["snapshot_timestamp", "flight_callsign", "aircraft_category", "altitude_feet", "velocity_knots", "flight_phase", "co2_emissions_kg_s"]
+            st.dataframe(
+                filtered_fct[display_cols].sort_values(by="snapshot_timestamp", ascending=False).head(20),
+                use_container_width=True
+            )
