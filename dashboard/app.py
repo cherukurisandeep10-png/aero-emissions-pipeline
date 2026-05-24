@@ -2,7 +2,7 @@
 Streamlit Dashboard for AeroStream
 Visualizes flight dynamics, operational phases, and real-time carbon emissions
 derived from our local analytical lakehouse.
-Features a clean, modern corporate light theme, compact visuals, and search filters.
+Features a clean, modern corporate light theme, compact visuals, and multi-phase search/filters.
 """
 
 import os
@@ -240,15 +240,20 @@ else:
     categories = sorted(df_fct["aircraft_category"].dropna().unique())
     selected_categories = st.sidebar.multiselect("Select Aircraft Classes", categories, default=categories)
     
+    # ✈️ NEW PHASE FILTER: Allow selecting Takeoff (Climbing) or Landed (On Ground / Descending) flights
+    phases = sorted(df_fct["flight_phase"].dropna().unique())
+    selected_phases = st.sidebar.multiselect("Filter by Operational Phase", phases, default=phases)
+    
     # 🔍 NEW SEARCH FEATURE: Target specific flight callsign (Enterprise search tool)
     st.sidebar.markdown("<hr style='border-color: #1e293b;' />", unsafe_allow_html=True)
     st.sidebar.markdown("<h3 style='color: #f1f5f9; font-size: 15px; font-weight: 700; margin-bottom: 5px;'>🔍 Target Active Flight</h3>", unsafe_allow_html=True)
     search_callsign = st.sidebar.text_input("Enter Callsign (e.g. DAL7174, UPS120)", value="").strip().upper()
     
-    # Apply baseline filters
+    # Apply baseline filters (including the new flight phase filter!)
     filtered_fct = df_fct[
         (df_fct["airline_prefix"].isin(selected_airlines)) & 
-        (df_fct["aircraft_category"].isin(selected_categories))
+        (df_fct["aircraft_category"].isin(selected_categories)) &
+        (df_fct["flight_phase"].isin(selected_phases))
     ]
     
     # Apply search filter if user typed anything
@@ -285,7 +290,7 @@ else:
     """, unsafe_allow_html=True)
     
     if filtered_fct.empty:
-        st.info("ℹ️ No active aircraft found matching that callsign query. Clear the text search or adjust your carrier filters!")
+        st.info("ℹ️ No active aircraft found matching that query. Clear the text search or adjust your airspace filters!")
     else:
         # Grid Columns
         col_left, col_right = st.columns([3, 2])
