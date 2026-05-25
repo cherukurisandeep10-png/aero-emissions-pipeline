@@ -2,7 +2,7 @@
 Streamlit Dashboard for AeroStream
 Visualizes flight dynamics, operational phases, and real-time carbon emissions
 derived from our local analytical lakehouse.
-Features a clean, modern corporate light theme, compact visuals, and multi-phase search/filters.
+Features a clean, modern corporate light theme, compact visuals, multi-phase filters, and chronological date selectors.
 """
 
 import os
@@ -233,18 +233,31 @@ else:
     # Sidebar Filters (Dark Slate Sidebar with bright controls)
     st.sidebar.markdown("<h2 style='color: #f8fafc; font-size: 18px; font-weight: 700; margin-bottom: 15px;'>🛰️ Airspace Control</h2>", unsafe_allow_html=True)
     
+    # 📅 Chronological Date Selector (Filters yesterday vs. today dynamically!)
+    df_fct["snapshot_date"] = pd.to_datetime(df_fct["snapshot_timestamp"]).dt.date
+    available_dates = sorted(df_fct["snapshot_date"].dropna().unique(), reverse=True)
+    
+    st.sidebar.markdown("<h3 style='color: #f1f5f9; font-size: 15px; font-weight: 700; margin-bottom: 5px;'>📅 Select Date</h3>", unsafe_allow_html=True)
+    selected_date = st.sidebar.selectbox(
+        "Choose Date to Track", 
+        ["All Dates"] + [str(d) for d in available_dates], 
+        index=1 if len(available_dates) > 0 else 0
+    )
+    
+    # Carriers filter
     df_fct["airline_prefix"] = df_fct["flight_callsign"].str[:3]
     airlines = sorted(df_fct["airline_prefix"].dropna().unique())
     selected_airlines = st.sidebar.multiselect("Select Active Carriers", airlines, default=airlines[:5] if len(airlines) > 5 else airlines)
     
+    # Aircraft class filter
     categories = sorted(df_fct["aircraft_category"].dropna().unique())
     selected_categories = st.sidebar.multiselect("Select Aircraft Classes", categories, default=categories)
     
-    # ✈️ NEW PHASE FILTER: Allow selecting Takeoff (Climbing) or Landed (On Ground / Descending) flights
+    # Flight Phase Filter (Takeoff, Cruise, Descent, Ground)
     phases = sorted(df_fct["flight_phase"].dropna().unique())
     selected_phases = st.sidebar.multiselect("Filter by Operational Phase", phases, default=phases)
     
-    # 🔍 NEW SEARCH FEATURE: Target specific flight callsign (Enterprise search tool)
+    # 🔍 Search Feature
     st.sidebar.markdown("<hr style='border-color: #1e293b;' />", unsafe_allow_html=True)
     st.sidebar.markdown("<h3 style='color: #f1f5f9; font-size: 15px; font-weight: 700; margin-bottom: 5px;'>🔍 Target Active Flight</h3>", unsafe_allow_html=True)
     search_callsign = st.sidebar.text_input("Enter Callsign (e.g. DAL7174, UPS120)", value="").strip().upper()
@@ -255,6 +268,10 @@ else:
         (df_fct["aircraft_category"].isin(selected_categories)) &
         (df_fct["flight_phase"].isin(selected_phases))
     ]
+    
+    # Apply Date Selector Filter
+    if selected_date != "All Dates":
+        filtered_fct = filtered_fct[filtered_fct["snapshot_date"].astype(str) == selected_date]
     
     # Apply search filter if user typed anything
     if search_callsign:
