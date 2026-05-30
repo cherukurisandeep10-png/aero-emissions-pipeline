@@ -25,7 +25,7 @@ RAW_DATA_DIR = "data/bronze/flights"
 DB_FILE = "data/lakehouse.db"
 
 # Continental USA Bounding Box to filter data size
-US_BBOX = {
+US_BBOX_COORDINATES = {
     "lamin": 24.0,
     "lomin": -125.0,
     "lamax": 49.0,
@@ -59,8 +59,8 @@ def generate_mock_flight_data(num_flights=150):
         country = random.choice(countries)
         
         # Position in US bounding box
-        lat = random.uniform(US_BBOX["lamin"], US_BBOX["lamax"])
-        lon = random.uniform(US_BBOX["lomin"], US_BBOX["lomax"])
+        lat = random.uniform(US_BBOX_COORDINATES["lamin"], US_BBOX_COORDINATES["lamax"])
+        lon = random.uniform(US_BBOX_COORDINATES["lomin"], US_BBOX_COORDINATES["lomax"])
         
         # Altitude: 8,000 to 41,000 feet (2,438 to 12,496 meters)
         alt_m = random.uniform(2400, 12500)
@@ -251,7 +251,7 @@ def run_pipeline():
     """Execute the ingestion and storage pipeline."""
     create_directories()
     
-    raw_payload = fetch_opensky_data(bbox=US_BBOX)
+    raw_payload = fetch_opensky_data(bbox=US_BBOX_COORDINATES)
     
     if raw_payload:
         df = process_state_vectors(raw_payload)
