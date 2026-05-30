@@ -118,7 +118,7 @@ def fetch_opensky_data(bbox=None):
     logger.info("Attempting to request live flight data from OpenSky API...")
     try:
         # Short timeout (5 seconds) to avoid blocking; fallback quickly if API is unresponsive
-        response = requests.get(url, params=params, timeout=5)
+        response = requests.get(url, params=params, timeout=8)
         response.raise_for_status()
         data = response.json()
         logger.info("Successfully fetched live data from OpenSky Network API!")
