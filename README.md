@@ -1,1 +1,41 @@
-# AeroStream: Resilient Aviation Operations & Emissions Data LakehouseA modern, end-to-end data lakehouse pipeline designed to ingest real-time global aviation telemetry, model flight states, and estimate carbon emissions (CO₂) utilizing the Medallion Architecture.---##  System Architecture```mermaidflowchart TD    subgraph Sources ["Data Sources"]        API[OpenSky Network API]        MOCK[Automated Mock Fallback Engine]    end    subgraph Lakehouse ["Data Lakehouse (Medallion Architecture)"]        subgraph Bronze ["Bronze Layer"]            parquet[Partitioned Parquet Lake Storage]        end        subgraph Silver ["Silver Layer"]            raw_db[(DuckDB: silver_flights)]        end        subgraph Gold ["Gold Layer (dbt Marts)"]            stg[stg_flights View] --> dim[dim_aircraft_types Table]            stg --> fct[fct_flights_emissions Table]        end    end    subgraph BI ["BI & Analytics"]        dashboard[Streamlit Analytics App]        dbt_test[dbt Core Test Suite]    end    API -->|Ingest Core| parquet    MOCK -->|Auto-Recovery fallback| parquet    parquet -->|Schema Enforcement Loader| raw_db    raw_db -->|dbt compile & run| stg    dim -->|Aggregated Metrics| dashboard    fct -->|Spatiotemporal Visuals| dashboard## Developer Log Changelog
+# AeroStream: Resilient Aviation Operations & Emissions Data Lakehouse
+
+A modern, end-to-end data lakehouse pipeline designed to ingest real-time global aviation telemetry, model flight states, and estimate carbon emissions (CO₂) utilizing the Medallion Architecture.
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Sources ["Data Sources"]
+        API[OpenSky Network API]
+        MOCK[Automated Mock Fallback Engine]
+    end
+
+    subgraph Lakehouse ["Data Lakehouse (Medallion Architecture)"]
+        subgraph Bronze ["Bronze Layer"]
+            parquet[Partitioned Parquet Lake Storage]
+        end
+
+        subgraph Silver ["Silver Layer"]
+            raw_db[(DuckDB: silver_flights)]
+        end
+
+        subgraph Gold ["Gold Layer (dbt Marts)"]
+            stg[stg_flights View] --> dim[dim_aircraft_types Table]
+            stg --> fct[fct_flights_emissions Table]
+        end
+    end
+
+    subgraph BI ["BI & Analytics"]
+        dashboard[Streamlit Analytics App]
+        dbt_test[dbt Core Test Suite]
+    end
+
+    API -->|Ingest Core| parquet
+    MOCK -->|Auto-Recovery fallback| parquet
+    parquet -->|Schema Enforcement Loader| raw_db
+    raw_db -->|dbt compile & run| stg
+    dim -->|Aggregated Metrics| dashboard
+    fct -->|Spatiotemporal Visuals| dashboard
