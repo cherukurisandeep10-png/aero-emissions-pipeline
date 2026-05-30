@@ -7,3 +7,4 @@ pytz>=2022.1
 matplotlib>=3.5.0
 plotly>=5.9.0
 pyyaml>=6.0
+logbook
