@@ -5,4 +5,4 @@ aero_emissions_profile:
       type: duckdb
       path: '../data/lakehouse.db'
       schema: main
-      threads: 4
+      threads: 8
